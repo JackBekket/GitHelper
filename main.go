@@ -22,16 +22,27 @@ import (
 	"github.com/tmc/langchaingo/vectorstores"
 )
 
-var ClientArray []*github.Client
+//var ClientArray []*github.Client
+
 var AI string
 var API_TOKEN string
 var DB string
 var NS string
 
+
+/*
+type Store struct {
+	Clientdb map[string]*github.Client  // map from repo_owner to client
+}
+*/
+
+
+var ClientMap = make(map[string]*github.Client)
+
 // Define your API endpoint for handling webhook requests.
 func handleWebhook(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	var client *github.Client
+	//var client *github.Client
 
 	/*
 	_ = godotenv.Load()
@@ -82,6 +93,10 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 			fmt.Printf("New issue opened: %s/%s Issue: %d Title: %s\n", repoOwner, repoName, issueID, issueTitle)
 			fmt.Println("Issue body is: ", issueBody)
+
+
+			//
+			client := ClientMap[repoOwner]
 
 			// Respond to the issue
 			response, err := generateResponse(issueBody, repoName)
@@ -236,8 +251,10 @@ func createClient(key_path string, app_id int) *github.Client {
 }
 
 
-func createClients(app_id int) []*github.Client  {
+func createClients(app_id int) (error)  {
 
+	//var white_list []string
+	white_list := []string{"GitjobTeam","JackBekket"}	//TODO: change it to load from .env / .yaml and not hardcoded
 
 	var result []*github.Client
 	tr := http.DefaultTransport
@@ -246,6 +263,7 @@ func createClients(app_id int) []*github.Client  {
 	itr, err := ghinstallation.NewAppsTransportKeyFromFile(tr, int64(app_id), pk_name)
     if err != nil {
         log.Fatal(err)
+		return err
     }
 
 	//create git client with app transport
@@ -259,11 +277,13 @@ func createClients(app_id int) []*github.Client  {
 
 	if client == nil {
 		log.Fatalf("failed to create git client for app: %v\n", err)
+		return err
 	}
 
 	installations, _, err := client.Apps.ListInstallations(context.Background(), &github.ListOptions{})
 	if err != nil {
 		log.Fatalf("failed to list installations: %v\n", err)
+		return err
 	}
 
 	// log installations
@@ -278,12 +298,18 @@ func createClients(app_id int) []*github.Client  {
 
 		user := val.GetAccount()
 		user_name := user.GetLogin()
-		log.Println("installed by entity_name:", user_name)
+		log.Println("installed by entity_name:", user_name)  // repo owner (?)
 		target_type := val.GetTargetType()
 		log.Println("target tyoe: ", target_type)
 
 
 		//TODO: input any other check here before creating a client
+		if !contains(white_list, user_name) {
+			//log.Println("User %s is not in the whitelist. Skipping creating client for it.", user_name)
+			return fmt.Errorf("User %s is not in the whitelist. Skipping creating client for it.", user_name)
+		  }
+
+
 
 
 		token, _, err := client.Apps.CreateInstallationToken(
@@ -292,6 +318,7 @@ func createClients(app_id int) []*github.Client  {
 			&github.InstallationTokenOptions{})
 		if err != nil {
 			log.Fatalf("failed to create installation token: %v\n", err)
+			return err
 		}
 
 		apiClient := github.NewClient(nil).WithAuthToken(
@@ -299,12 +326,18 @@ func createClients(app_id int) []*github.Client  {
 		)
 		if apiClient == nil {
 			log.Fatalf("failed to create new git client with token: %v\n", err)
+			return err
 		}
 
-		fmt.Println("API CLIENT: ",apiClient)
+		//fmt.Println("API CLIENT: ",apiClient)
 
 		//append
 		result = append(result, apiClient)
+
+
+		// add to map
+		ClientMap[user_name] = apiClient
+
 	}
 
 	
@@ -313,8 +346,23 @@ func createClients(app_id int) []*github.Client  {
 
 	log.Println("clients created: ", result)
 
+
+
 	//eturn apiClient
-	return result
+	//return result
+	//return ClientMap
+	return nil
+}
+
+
+func getClientByRepoOwner(owner string) (*github.Client,error) {
+	client,ok := ClientMap[owner]
+	if ok {
+		return client, nil
+	}
+	return nil, fmt.Errorf("client not found for key: %s", owner)
+
+
 }
 
 
@@ -332,7 +380,18 @@ func main() {
 		// ... handle error
 		panic(err)
 	}
-	ClientArray = createClients(app_id)
+	err = createClients(app_id)
+	if err != nil {
+		log.Println("error creating clients: ", err)
+	}
+
+
+
+	/*
+	for _, v := range clientArray {
+		Store.clientdb[]
+	}
+	*/
 
 	//Test getting vectorstore from .env
 	// In production name should be replaced by event value
@@ -408,3 +467,14 @@ func rag(question string, ai_url string, api_token string, numOfResults int, sto
 
 	return result, nil
 }
+
+
+func contains(slice []string, value string) bool {
+	for _, v := range slice {
+	  if v == value {
+		return true
+	  }
+	}
+	return false
+  }
+  
