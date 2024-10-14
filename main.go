@@ -276,6 +276,12 @@ func createClients(app_id int) []*github.Client  {
 	for _, val := range installations {
 		installID = val.GetID()
 
+		user := val.GetAccount()
+		user_name := user.Login
+		log.Println("installed by user_name:", user_name)
+		target_type := val.GetTargetType()
+		log.Println("target tyoe: ", target_type)
+
 
 		//TODO: input any other check here before creating a client
 
