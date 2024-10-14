@@ -22,7 +22,7 @@ import (
 	"github.com/tmc/langchaingo/vectorstores"
 )
 
-var Client *github.Client
+var ClientArray []*github.Client
 var AI string
 var API_TOKEN string
 var DB string
@@ -31,7 +31,14 @@ var NS string
 // Define your API endpoint for handling webhook requests.
 func handleWebhook(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	client := Client
+	var client *github.Client
+
+	/*
+	_ = godotenv.Load()
+	_id := os.Getenv("APP_ID")
+	app_id := _id
+	*/
+
 
 	// Extract webhook event type from the header
 	eventType := github.WebHookType(r)
@@ -40,6 +47,9 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error reading request body: %v", err), http.StatusBadRequest)
 		return
 	}
+
+
+
 	// Parse event based on eventType
 	switch eventType {
 	case "installation_repositories":
@@ -81,6 +91,7 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 				response = "Can't generate response bleep-bloop"
 			}
 			fmt.Println("response generated")
+			//createClients()
 			respond(client, repoOwner, repoName, int64(issueID), response)
 		}
 
@@ -146,6 +157,9 @@ func respond(client *github.Client, owner string, repo string, id int64, respons
 
 }
 
+
+
+// get only last installment, bug, will be deprecated
 func createClient(key_path string, app_id int) *github.Client {
 	//const gitHost = "https://git.api.com"
 
@@ -222,6 +236,82 @@ func createClient(key_path string, app_id int) *github.Client {
 }
 
 
+func createClients(app_id int) []*github.Client  {
+
+
+	var result []*github.Client
+	tr := http.DefaultTransport
+	pk_name := os.Getenv("PRIVATE_KEY_NAME")
+
+	itr, err := ghinstallation.NewAppsTransportKeyFromFile(tr, int64(app_id), pk_name)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+	//create git client with app transport
+	client := github.NewClient(
+		&http.Client{
+			Transport: itr,
+			Timeout:   time.Second * 30,
+		},
+	)
+	//)
+
+	if client == nil {
+		log.Fatalf("failed to create git client for app: %v\n", err)
+	}
+
+	installations, _, err := client.Apps.ListInstallations(context.Background(), &github.ListOptions{})
+	if err != nil {
+		log.Fatalf("failed to list installations: %v\n", err)
+	}
+
+	// log installations
+	println("installations: ", installations)
+
+
+	//capture our installationId for our app
+	//we need this for the access token
+	var installID int64
+	for _, val := range installations {
+		installID = val.GetID()
+
+
+		//TODO: input any other check here before creating a client
+
+
+		token, _, err := client.Apps.CreateInstallationToken(
+			context.Background(),
+			installID,
+			&github.InstallationTokenOptions{})
+		if err != nil {
+			log.Fatalf("failed to create installation token: %v\n", err)
+		}
+
+		apiClient := github.NewClient(nil).WithAuthToken(
+			token.GetToken(),
+		)
+		if apiClient == nil {
+			log.Fatalf("failed to create new git client with token: %v\n", err)
+		}
+
+		fmt.Println("API CLIENT: ",apiClient)
+
+		//append
+		result = append(result, apiClient)
+	}
+
+	
+
+
+
+	log.Println("clients created: ", result)
+
+	//eturn apiClient
+	return result
+}
+
+
 
 func main() {
 	fmt.Println("main process started")
@@ -230,13 +320,13 @@ func main() {
 	_ = godotenv.Load()
 	_id := os.Getenv("APP_ID")
 	//wh_secret := os.Getenv("WEBHOOK_SECRET")
-	pk_path := os.Getenv("PRIVATE_KEY_PATH")
+	//pk_path := os.Getenv("PRIVATE_KEY_PATH")
 	app_id, err := strconv.Atoi(_id)
 	if err != nil {
 		// ... handle error
 		panic(err)
 	}
-	Client = createClient(pk_path, app_id)
+	ClientArray = createClients(app_id)
 
 	//Test getting vectorstore from .env
 	// In production name should be replaced by event value
