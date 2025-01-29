@@ -1,7 +1,8 @@
-## Package: rag
+# rag
 
-### Imports:
+Package: rag
 
+Imports:
 - context
 - fmt
 - github.com/JackBekket/hellper/lib/embeddings
@@ -9,27 +10,28 @@
 - github.com/tmc/langchaingo/llms/openai
 - github.com/tmc/langchaingo/vectorstores
 
-### External Data, Input Sources:
+External data, input sources:
+- The code uses a vector store to store and retrieve documents and code snippets.
+- It relies on an OpenAI API to access a large language model (LLM) for text embedding and question answering.
 
-- vectorstores.VectorStore: This is an interface for interacting with a vector store, which is used to store and retrieve embeddings of documents.
+Code summary:
+- RagReflexia: This function performs a RAG (Retrieval-Augmented Generation) query by first retrieving relevant documents and code snippets from the vector store based on the input question. Then, it uses the retrieved content to answer the question using a stuffed QA chain.
+- RagWithOptions: This function is similar to RagReflexia but allows for additional options to be passed to the vector store during the retrieval process.
+- StuffedQA_Rag: This function performs a RAG query using the stuffed QA chain, which combines all retrieved documents into a single prompt for the LLM.
+- RefinedQA_RAG: This function performs a RAG query using the refine documents chain, which iterates over the retrieved documents one by one to update the answer.
 
-### Code Summary:
+In summary, the rag package provides functions for performing RAG queries using various chains and options. It leverages a vector store and an OpenAI API to retrieve relevant information and generate answers to questions.
 
-#### RagReflexia:
+Project package structure:
+- rag.go
+- rag_test.go
+- pkg/rag/rag.go
 
-This function takes a question, API URL, API token, number of results, and a vector store as input. It first creates an embeddings client using the specified API and embedding model. Then, it performs semantic search on the vector store to retrieve relevant documents and code snippets based on the question. The retrieved documents and code snippets are combined into a single prompt for the LLM. Finally, it calls a stuffed QA chain to generate an answer to the question using the combined prompt.
+Relations between code entities:
+- The functions RagReflexia, RagWithOptions, StuffedQA_Rag, and RefinedQA_RAG all interact with the vector store and the OpenAI API to perform RAG queries.
+- The StuffedQA_Rag and RefinedQA_RAG functions use different chains to process the retrieved documents and generate answers.
 
-#### RagWithOptions:
-
-This function takes a question, API URL, API token, number of results, a vector store, and optional vectorstore.Option as input. It creates an embeddings client and then calls a retrieval QA chain to generate an answer to the question using the specified vector store and options.
-
-#### StuffedQA_Rag:
-
-This function takes a question, API URL, API token, number of results, and a vector store as input. It creates an embeddings client and performs semantic search on the vector store to retrieve relevant documents. Then, it calls a stuffed QA chain to generate an answer to the question using the retrieved documents.
-
-#### RefinedQA_RAG:
-
-This function takes a question, API URL, API token, number of results, and a vector store as input. It creates an embeddings client and performs semantic search on the vector store to retrieve relevant documents. Then, it calls a refine QA chain to generate an answer to the question using the retrieved documents.
-
-
+Unclear places:
+- It is unclear how the vector store is initialized and populated with documents and code snippets.
+- It is unclear how the OpenAI API is configured and accessed.
 
