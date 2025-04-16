@@ -36,18 +36,18 @@ func TestPlanner(t *testing.T) {
 		Tools: &tools,
 	}
 
-	stateInterface, err := lc.GetPlan(t.Context(), codeMonkey.ReWOO{
-		Task: `There is a specific code at 'Hellper' collection at vector store, related to a telegram bot api initialization.
-I need to find a web documentation about that library and initialization sequence`,
+	s, err := lc.GetPlan(t.Context(), codeMonkey.ReWOO{
+		Task: `Call semanticSearch tool. Collection Name: 'Hellper' Query: How does telegram bot api initialized?
+Then extract telegram bot api library name and find something about it in the web using available web search tool`,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := stateInterface.(codeMonkey.ReWOO)
+	state := s.(codeMonkey.ReWOO)
 
 	t.Log("Returned steps:")
 	for _, step := range state.Steps {
-		t.Logf("Step: %s", step)
+		t.Logf("Step: %+v", step)
 	}
 	if len(state.Steps) == 0 {
 		t.Fatal("empty steps")
@@ -56,5 +56,38 @@ I need to find a web documentation about that library and initialization sequenc
 	t.Logf("Returned plan string:\n%s", state.PlanString)
 	if state.PlanString == "" {
 		t.Fatal("empty plan string")
+	}
+
+	pLen := 0
+	for {
+		route := codeMonkey.Route(t.Context(), state)
+		if route == codeMonkey.GraphSolveName {
+			s, err := lc.Solve(t.Context(), state)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state = s.(codeMonkey.ReWOO)
+			if state.Result == "" {
+				t.Fatal("empty solver result")
+			}
+			t.Logf("Answer: %s", state.Result)
+
+			break
+		} else {
+			s, err := lc.ToolExecution(t.Context(), state)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state = s.(codeMonkey.ReWOO)
+			if len(state.Results) == pLen {
+				t.Fatal("no new results")
+			}
+			pLen = len(state.Results)
+
+			t.Log("Results update:")
+			for stepName, result := range state.Results {
+				t.Logf("%s: %+v", stepName, result)
+			}
+		}
 	}
 }
