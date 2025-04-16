@@ -143,13 +143,11 @@ func (lc LLMContext) ToolExecution(ctx context.Context, s interface{}) (interfac
 		state.Results = map[string]string{}
 	}
 
-	// Not sure how to actually execute received tool call
-	msg := llms.TextParts(llms.ChatMessageTypeAI, response.Choices[0].Content)
-	for _, toolCall := range response.Choices[0].ToolCalls {
-		msg.Parts = append(msg.Parts, toolCall)
-		fmt.Printf("%+v", toolCall)
-	}
-	state.Results[step.StepName] = fmt.Sprintf("%v", msg.Parts[0])
+	content := response.Choices[0].Content
+	// TODO - work around tool call results
+	// for _, toolCall := range response.Choices[0].ToolCalls {
+	// }
+	state.Results[step.StepName] = content
 	return state, err
 }
 
