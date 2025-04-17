@@ -42,7 +42,7 @@ func TestPlanner(t *testing.T) {
 	}
 
 	s, err := lc.GetPlan(t.Context(), codeMonkey.ReWOO{
-		Task: `Using semantic search tool, which can search across various code from the project collections find out the telegram library name for the project called "Hellper", and find documentation link for it in the web`,
+		Task: `Using semantic search tool, which can search across various code from the project collections find out the telegram library name in the code file contents for the project called "Hellper". Extract it from the given code and use a web search to find the pkg.go.dev documentation for it. Give me the URL for it.`,
 	})
 	if err != nil {
 		t.Fatal(err)

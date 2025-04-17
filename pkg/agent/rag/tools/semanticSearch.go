@@ -11,7 +11,7 @@ import (
 
 var SemanticSearchDefinition = llms.FunctionDefinition{
 	Name:        "semanticSearch",
-	Description: "Performs semantic search across the code files using vector store. Returns the file contents.",
+	Description: "Performs semantic search in the vector store of the saved code blobs. Returns matching file contents",
 	Parameters: map[string]any{
 		"type": "object",
 		"properties": map[string]any{

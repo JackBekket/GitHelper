@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 
@@ -34,9 +35,9 @@ Task: Thomas, Toby, and Rebecca worked a total of 157 hours in one week. Thomas 
 hours. Toby worked 10 hours less than twice what Thomas worked, and Rebecca worked 8 hours
 less than Toby. How many hours did Rebecca work?
 Plan: Given Thomas worked x hours, translate the problem into algebraic expressions and solve
-with Wolfram Alpha. #E1 = WolframAlpha[Solve x + (2x − 10) + ((2x − 10) − 8) = 157]
+with Wolfram Alpha. #E1 = WolframAlpha[{"query": "Solve x + (2x − 10) + ((2x − 10) − 8) = 157"}]
 Plan: Find out the number of hours Thomas worked. #E2 = LLM[What is x, given #E1]
-Plan: Calculate the number of hours Rebecca worked. #E3 = Calculator[(2 ∗ #E2 − 10) − 8]
+Plan: Calculate the number of hours Rebecca worked. #E3 = Calculator[{"query": "(2 ∗ #E2 − 10) − 8"}]
 
 Begin! 
 Describe your plans with rich details. Each Plan should be followed by only one #E.
@@ -54,6 +55,8 @@ directly with no extra words.
 
 Task: %s
 Response:`
+
+const PromptLLMTool = `Do not include any introductory phrases or explanations. Task: %s`
 
 type ReWOOStep struct {
 	Plan      string
@@ -119,28 +122,32 @@ func (lc LLMContext) ToolExecution(ctx context.Context, s interface{}) (interfac
 	for stepName, result := range state.Results {
 		step.ToolInput = strings.ReplaceAll(step.ToolInput, stepName, result)
 	}
-	prompt := step.ToolInput
+	prompt := fmt.Sprintf(PromptLLMTool, step.ToolInput)
 	options := []llms.CallOption{}
 	content := ""
-	if step.Tool == LLMToolName {
-		response, err := lc.LLM.GenerateContent(ctx,
-			agent.CreateMessageContentHuman(
-				prompt,
-			),
-			options...,
-		)
-		if err != nil {
-			return state, err
+	if step.Tool != LLMToolName {
+		prompt = fmt.Sprintf("Call the '%s' tool with args: %s\nResolve any string concatenations", step.Tool, step.ToolInput)
+		for _, tool := range *lc.Tools {
+			if tool.Function.Name == step.Tool {
+				options = append(options, llms.WithTools([]llms.Tool{tool}))
+			}
 		}
-		content = response.Choices[0].Content
-	} else {
-		response, err := lc.ToolsExecutor.Execute(ctx, llms.ToolCall{
-			Type: "function",
-			FunctionCall: &llms.FunctionCall{
-				Name:      step.Tool,
-				Arguments: step.ToolInput,
-			},
-		})
+		log.Println("Prompt:", prompt)
+	}
+
+	response, err := lc.LLM.GenerateContent(ctx,
+		agent.CreateMessageContentHuman(
+			prompt,
+		),
+		options...,
+	)
+	if err != nil {
+		return state, err
+	}
+	content = response.Choices[0].Content
+	for _, toolCall := range response.Choices[0].ToolCalls {
+		log.Printf("Args: %s", toolCall.FunctionCall.Arguments)
+		response, err := lc.ToolsExecutor.Execute(ctx, toolCall)
 		if err != nil {
 			return state, err
 		}
@@ -219,7 +226,7 @@ yourself. Input can be any instruction.`,
 				}
 				fieldsJson, err := json.Marshal(fields)
 				if err == nil {
-					input = fmt.Sprintf("json: %s", string(fieldsJson))
+					input = string(fieldsJson)
 				}
 			}
 		}
