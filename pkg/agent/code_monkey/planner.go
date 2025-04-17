@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 
@@ -132,7 +131,6 @@ func (lc LLMContext) ToolExecution(ctx context.Context, s interface{}) (interfac
 				options = append(options, llms.WithTools([]llms.Tool{tool}))
 			}
 		}
-		log.Println("Prompt:", prompt)
 	}
 
 	response, err := lc.LLM.GenerateContent(ctx,
@@ -146,7 +144,6 @@ func (lc LLMContext) ToolExecution(ctx context.Context, s interface{}) (interfac
 	}
 	content = response.Choices[0].Content
 	for _, toolCall := range response.Choices[0].ToolCalls {
-		log.Printf("Args: %s", toolCall.FunctionCall.Arguments)
 		response, err := lc.ToolsExecutor.Execute(ctx, toolCall)
 		if err != nil {
 			return state, err

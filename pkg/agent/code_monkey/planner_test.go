@@ -66,6 +66,11 @@ func TestPlanner(t *testing.T) {
 	for {
 		route := codeMonkey.Route(t.Context(), state)
 		if route == codeMonkey.GraphSolveName {
+			t.Log("Results: ")
+			for stepName, result := range state.Results {
+				t.Logf("%s: %+v", stepName, result)
+			}
+
 			s, err := lc.Solve(t.Context(), state)
 			if err != nil {
 				t.Fatal(err)
@@ -87,11 +92,6 @@ func TestPlanner(t *testing.T) {
 				t.Fatal("no new results")
 			}
 			pLen = len(state.Results)
-
-			t.Log("Results update:")
-			for stepName, result := range state.Results {
-				t.Logf("%s: %+v", stepName, result)
-			}
 		}
 	}
 }
