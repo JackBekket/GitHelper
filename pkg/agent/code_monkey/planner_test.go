@@ -26,19 +26,23 @@ func TestPlanner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tools, err := tools.GetTools()
+	tools, toolsExecutor, err := tools.GetTools(
+		os.Getenv("AI_URL"),
+		os.Getenv("API_TOKEN"),
+		os.Getenv("DB_LINK"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	lc := codeMonkey.LLMContext{
-		LLM:   llm,
-		Tools: &tools,
+		LLM:           llm,
+		Tools:         &tools,
+		ToolsExecutor: toolsExecutor,
 	}
 
 	s, err := lc.GetPlan(t.Context(), codeMonkey.ReWOO{
-		Task: `Call semanticSearch tool. Collection Name: 'Hellper' Query: How does telegram bot api initialized?
-Then extract telegram bot api library name and find something about it in the web using available web search tool`,
+		Task: `Using semantic search tool, which can search across various code from the project collections find out the telegram library name for the project called "Hellper", and find documentation link for it in the web`,
 	})
 	if err != nil {
 		t.Fatal(err)

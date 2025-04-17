@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
 
 	"github.com/JackBekket/GitHelper/pkg/agent/rag/tools"
+	toolslegacy "github.com/JackBekket/GitHelper/pkg/agent/rag/tools_legacy"
 	"github.com/JackBekket/langgraphgo/graph"
 )
 
@@ -76,7 +78,11 @@ func OneShotRun(prompt string, model openai.LLM, historyState ...llms.MessageCon
 		)
 	}
 
-	Tools, _ = tools.GetTools()
+	Tools, _, _ = tools.GetTools(
+		os.Getenv("AI_URL"),
+		os.Getenv("API_TOKEN"),
+		os.Getenv("DB_LINK"),
+	)
 
 	//Tools = tools
 	Model = model
@@ -219,7 +225,7 @@ func shouldSearchDocuments(ctx context.Context, state []llms.MessageContent) str
 
 // This function is performing similarity search in our db vectorstore.
 func semanticSearch(ctx context.Context, state []llms.MessageContent) ([]llms.MessageContent, error) {
-	semanticSearchTool := tools.SemanticSearchTool{}
+	semanticSearchTool := toolslegacy.SemanticSearchTool{}
 	res, err := semanticSearchTool.Execute(ctx, state)
 	if err != nil {
 		// Handle the error

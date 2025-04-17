@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
@@ -13,8 +14,9 @@ import (
 )
 
 type LLMContext struct {
-	LLM   *openai.LLM
-	Tools *[]llms.Tool
+	LLM           *openai.LLM
+	Tools         *[]llms.Tool
+	ToolsExecutor *tools.ToolsExectutor
 }
 
 // This is the main function for this package
@@ -51,7 +53,11 @@ func OneShotRun(prompt string, llm openai.LLM, historyState ...llms.MessageConte
 	*/
 
 	// MAIN WORKFLOW
-	tools, err := tools.GetTools()
+	tools, _, err := tools.GetTools(
+		os.Getenv("AI_URL"),
+		os.Getenv("API_TOKEN"),
+		os.Getenv("DB_LINK"),
+	)
 	if err != nil {
 		log.Printf("error: %v", err)
 		return fmt.Sprintf("error :%v", err)

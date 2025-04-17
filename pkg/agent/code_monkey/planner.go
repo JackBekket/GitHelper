@@ -2,6 +2,7 @@ package code_monkey
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -15,7 +16,6 @@ const (
 	GraphToolName  = "tool"
 	GraphSolveName = "solve"
 )
-
 const LLMToolName = "LLM"
 
 const PromptGetPlan = `For the following task, make plans that can solve the problem step by step. For each plan, indicate
@@ -23,9 +23,9 @@ which external tool together with tool input to retrieve evidence. You can store
 variable #E that can be called by later tools. (Plan, #E1, Plan, #E2, Plan, ...)
 
 Tools can be one of the following:
-(1) Google[input]: Worker that searches results from Google. Useful when you need to find short
+(1) search[json: {"query": "string"}]: Worker that searches results from Duckduckgo. Useful when you need to find short
 and succinct answers about a specific topic. The input should be a search query.
-(2) ` + LLMToolName + `[input]: A pretrained LLM like yourself. Useful when you need to act with general
+(2) ` + LLMToolName + `[string]: A pretrained LLM like yourself. Useful when you need to act with general
 world knowledge and common sense. Prioritize it when you are confident in solving the problem
 yourself. Input can be any instruction.
 
@@ -42,6 +42,7 @@ Begin!
 Describe your plans with rich details. Each Plan should be followed by only one #E.
 
 Task: `
+
 const PromptSolver = `Solve the following task or problem. To solve the problem, we have made step-by-step Plan and \
 retrieved corresponding Evidence to each Plan. Use them with caution since long evidence might \
 contain irrelevant information.
@@ -121,14 +122,7 @@ func (lc LLMContext) ToolExecution(ctx context.Context, s interface{}) (interfac
 	prompt := step.ToolInput
 	options := []llms.CallOption{}
 	content := ""
-	if step.Tool != LLMToolName {
-		prompt = fmt.Sprintf(
-			"Use tool %s to process the task.\nTask: %s",
-			step.Tool,
-			prompt,
-		)
-		content = agent.OneShotRun(prompt, *lc.LLM)
-	} else {
+	if step.Tool == LLMToolName {
 		response, err := lc.LLM.GenerateContent(ctx,
 			agent.CreateMessageContentHuman(
 				prompt,
@@ -139,13 +133,29 @@ func (lc LLMContext) ToolExecution(ctx context.Context, s interface{}) (interfac
 			return state, err
 		}
 		content = response.Choices[0].Content
+	} else {
+		response, err := lc.ToolsExecutor.Execute(ctx, llms.ToolCall{
+			Type: "function",
+			FunctionCall: &llms.FunctionCall{
+				Name:      step.Tool,
+				Arguments: step.ToolInput,
+			},
+		})
+		if err != nil {
+			return state, err
+		}
+		content = response.Content
 	}
 
 	if len(state.Results) == 0 {
 		state.Results = map[string]string{}
 	}
+	jsonSafeContent, err := json.Marshal(content)
+	if err != nil {
+		return state, err
+	}
 
-	state.Results[step.StepName] = content
+	state.Results[step.StepName] = string(jsonSafeContent)
 	return state, nil
 }
 
@@ -200,7 +210,20 @@ yourself. Input can be any instruction.`,
 		},
 	})
 	for idx, tool := range tools {
-		desc += fmt.Sprintf("(%d) %s[input]: %s\n", idx, tool.Function.Name, tool.Function.Description)
+		input := "string"
+		if tool.Function.Parameters != nil {
+			if props, ok := tool.Function.Parameters.(map[string]interface{})["properties"]; ok {
+				fields := map[string]string{}
+				for prop, val := range props.(map[string]interface{}) {
+					fields[prop] = val.(map[string]interface{})["type"].(string)
+				}
+				fieldsJson, err := json.Marshal(fields)
+				if err == nil {
+					input = fmt.Sprintf("json: %s", string(fieldsJson))
+				}
+			}
+		}
+		desc += fmt.Sprintf("(%d) %s[%s]: %s\n", idx, tool.Function.Name, input, tool.Function.Description)
 	}
 	return desc
 }
