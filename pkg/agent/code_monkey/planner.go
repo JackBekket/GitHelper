@@ -120,35 +120,33 @@ func (lc LLMContext) ToolExecution(ctx context.Context, s interface{}) (interfac
 	}
 	prompt := step.ToolInput
 	options := []llms.CallOption{}
+	content := ""
 	if step.Tool != LLMToolName {
 		prompt = fmt.Sprintf(
 			"Use tool %s to process the task.\nTask: %s",
 			step.Tool,
 			prompt,
 		)
-		options = append(options, llms.WithTools(*lc.Tools))
-	}
-
-	response, err := lc.LLM.GenerateContent(ctx,
-		agent.CreateMessageContentHuman(
-			prompt,
-		),
-		options...,
-	)
-	if err != nil {
-		return state, err
+		content = agent.OneShotRun(prompt, *lc.LLM)
+	} else {
+		response, err := lc.LLM.GenerateContent(ctx,
+			agent.CreateMessageContentHuman(
+				prompt,
+			),
+			options...,
+		)
+		if err != nil {
+			return state, err
+		}
+		content = response.Choices[0].Content
 	}
 
 	if len(state.Results) == 0 {
 		state.Results = map[string]string{}
 	}
 
-	content := response.Choices[0].Content
-	// TODO - work around tool call results
-	// for _, toolCall := range response.Choices[0].ToolCalls {
-	// }
 	state.Results[step.StepName] = content
-	return state, err
+	return state, nil
 }
 
 func (lc LLMContext) Solve(ctx context.Context, s interface{}) (interface{}, error) {
