@@ -11,6 +11,8 @@ import (
 	codeMonkey "github.com/JackBekket/GitHelper/pkg/agent/code_monkey"
 )
 
+const TestPrompt = `Using semantic search tool, which can search across various code from the project collections find out the telegram library name in the code file contents for the project called "Hellper". Extract it from the given code and use a web search to find the pkg.go.dev documentation for it. Give me the URL for it.`
+
 func TestPlanner(t *testing.T) {
 	err := godotenv.Load()
 	if err != nil {
@@ -42,7 +44,7 @@ func TestPlanner(t *testing.T) {
 	}
 
 	s, err := lc.GetPlan(t.Context(), codeMonkey.ReWOO{
-		Task: `Using semantic search tool, which can search across various code from the project collections find out the telegram library name in the code file contents for the project called "Hellper". Extract it from the given code and use a web search to find the pkg.go.dev documentation for it. Give me the URL for it.`,
+		Task: TestPrompt,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -94,4 +96,45 @@ func TestPlanner(t *testing.T) {
 			pLen = len(state.Results)
 		}
 	}
+}
+
+func TestOneShotRun(t *testing.T) {
+	err := godotenv.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	llm, err := openai.New(
+		openai.WithToken(os.Getenv("API_TOKEN")),
+		openai.WithModel(os.Getenv("MODEL")),
+		openai.WithBaseURL(os.Getenv("AI_URL")),
+		openai.WithAPIVersion("v1"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tools, toolsExecutor, err := tools.GetTools(
+		os.Getenv("AI_URL"),
+		os.Getenv("API_TOKEN"),
+		os.Getenv("DB_LINK"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lc := codeMonkey.LLMContext{
+		LLM:           llm,
+		Tools:         &tools,
+		ToolsExecutor: toolsExecutor,
+	}
+
+	result, err := lc.OneShotRun(t.Context(), TestPrompt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result == "" {
+		t.Fatal("empty result")
+	}
+	t.Log(result)
 }
