@@ -109,7 +109,7 @@ func (s *ReflexiaService) Reflect(ctx context.Context, repoURL, username, token 
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("%d status code response: %s", resp.StatusCode, string(body))
 	}
