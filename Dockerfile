@@ -1,24 +1,16 @@
+FROM golang:latest AS builder
+LABEL maintainer="mintyleaf <mintyleafdev@gmail.com>"
 
+WORKDIR /build
 
+COPY go.mod go.sum main.go ./
+COPY internal ./internal
 
-FROM golang:1.23-bookworm
+RUN CGO_ENABLED=0 GOOS=linux go build -o githellper ./main.go
 
-WORKDIR /app
+FROM alpine
+WORKDIR /
 
+COPY --from=builder /build/githellper ./githellper
 
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-
-RUN apt update && apt install -y ca-certificates
-RUN go build -o main .
-#RUN go build -o /out/bot .
-
-
-
-#RUN apk add ca-certificates
-
-
-EXPOSE 8080
-
-CMD [ "./main" ]
+CMD ["/githellper"]

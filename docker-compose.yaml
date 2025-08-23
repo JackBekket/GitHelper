@@ -1,6 +1,0 @@
-services:
-  githelper:
-    build: .
-    ports:
-      - 8186:8186
-    restart: unless-stopped
